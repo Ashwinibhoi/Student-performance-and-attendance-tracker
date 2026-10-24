@@ -1,0 +1,720 @@
+STUDENT PERFORMANCE & ATTENDANCE TRACKER
+MySQL Practical Assignment – Answers, Output & Reason
+=====================================================
+
+I------------------------------------------------------------
+Q1. CRUD OPERATIONS
+------------------------------------------------------------
+
+Q1(a) Display all students (READ)
+SQL:
+SELECT * FROM Students;
+
+Reason:
+SELECT reads/displays records from the Students table.
+
+output:
++------------+--------------+------------+--------+-------------------+--------------+----------+---------------+---------------+
+| student_id | name         | dob        | gender | email             | phone_number | address  | admission_date| department_id |
++------------+--------------+------------+--------+-------------------+--------------+----------+---------------+---------------+
+| 1          | Aarav Sharma | 2005-04-12 | Male   | aarav@example.com | 9876500001   | Surat    | 2023-06-15    | 1             |
+| 2          | Diya Patel   | 2005-08-20 | Female | diya@example.com  | 9876500002   | Surat    | 2023-06-20    | 1             |
+| 3          | Rohan Shah   | 2004-12-02 | Male   | rohan@example.com | 9876500003   | Vadodara | 2022-06-18    | 2             |
+| 4          | Meera Joshi  | 2005-02-14 | Female | meera@example.com | 9876500004   | Surat    | 2023-07-01    | 1             |
++------------+--------------+------------+--------+-------------------+--------------+----------+---------------+---------------+
+
+Q1(b) Insert a new student (CREATE)
+SQL:
+INSERT INTO Students
+(name, dob, gender, email, phone_number, address, admission_date, department_id)
+VALUES
+('Karan Patel','2005-09-10','Male','karan@example.com','9876500005','Surat','2024-06-15',1);
+
+Reason:
+INSERT adds a new student record. department_id = 1 must already exist in Departments.
+
+Verify:
+SELECT student_id, name, email FROM Students WHERE email='karan@example.com';
+
+output :
++------------+-------------+-------------------+
+| student_id | name        | email             |
++------------+-------------+-------------------+
+| 5          | Karan Patel | karan@example.com |
++------------+-------------+-------------------+
+
+Q1(c) Update a student's contact detail (UPDATE)
+SQL:
+UPDATE Students
+SET phone_number='9876599999'
+WHERE student_id=1;
+
+Reason:
+UPDATE changes existing data. WHERE is important; without it every student's phone number could be changed.
+
+Verify:
+SELECT student_id, name, phone_number
+FROM Students WHERE student_id=1;
+
+output:
++------------+--------------+--------------+
+| student_id | name         | phone_number |
++------------+--------------+--------------+
+| 1          | Aarav Sharma | 9876599999   |
++------------+--------------+--------------+
+
+Q1(d) Delete a student who has dropped out (DELETE)
+SQL:
+-- Use a test student ID, and make sure it is the correct record before deleting.
+DELETE FROM Students WHERE student_id=5;
+
+Reason:
+DELETE removes the selected record. Foreign keys in Enrollments, Attendance and Grades use ON DELETE CASCADE, so related records for that student are deleted too. Do not run this unless student_id=5 is the intended record.
+
+Verify:
+SELECT * FROM Students WHERE student_id=5;
+output: Empty set (0 rows), if that student was deleted.
+
+------------------------------------------------------------
+Q2. WHERE, HAVING, LIMIT
+------------------------------------------------------------
+
+Q2(a) Get students in Computer Science department
+SQL:
+SELECT s.student_id, s.name, d.department_name
+FROM Students AS s
+JOIN Departments AS d ON s.department_id=d.department_id
+WHERE d.department_name='Computer Science'
+ORDER BY s.student_id;
+
+Reason:
+WHERE filters rows to only the Computer Science department.
+
+output:
++------------+--------------+--------------------+
+| student_id | name         | department_name    |
++------------+--------------+--------------------+
+| 1          | Aarav Sharma | Computer Science   |
+| 2          | Diya Patel   | Computer Science   |
+| 4          | Meera Joshi  | Computer Science   |
++------------+--------------+--------------------+
+
+Q2(b) Top 10 highest-scoring students (rank by average marks)
+SQL:
+SELECT s.name, ROUND(AVG(g.marks_obtained),2) AS average_marks
+FROM Students s
+JOIN Grades g ON s.student_id=g.student_id
+GROUP BY s.student_id, s.name
+ORDER BY average_marks DESC
+LIMIT 10;
+
+Reason:
+AVG calculates each student's average across graded courses; GROUP BY makes one row per student; ORDER BY sorts highest first; LIMIT returns at most 10 rows.
+
+output:
++--------------+---------------+
+| name         | average_marks |
++--------------+---------------+
+| Aarav Sharma | 93.00         |
+| Meera Joshi  | 87.00         |
+| Rohan Shah   | 84.00         |
+| Diya Patel   | 68.00         |
++--------------+---------------+
+Note: Correct descending order is Aarav Sharma (93.00), Meera Joshi (87.00), Rohan Shah (84.00), Diya Patel (68.00).
+
+Q2(c) Students with attendance below 75%
+SQL:
+SELECT s.name,
+       ROUND(100 * AVG(a.status IN ('Present','Late')),2) AS attendance_pct
+FROM Students s
+JOIN Attendance a ON s.student_id=a.student_id
+GROUP BY s.student_id, s.name
+HAVING attendance_pct < 75
+ORDER BY attendance_pct;
+
+Reason:
+The expression is 1 for Present/Late and 0 for Absent. AVG gives the attended fraction. HAVING filters grouped/aggregated results; WHERE cannot filter an aggregate in this way.
+
+output:
++-------------+---------------+
+| name        | attendance_pct|
++-------------+---------------+
+| Diya Patel  | 50.00         |
++-------------+---------------+
+Note: The uploaded sample data gives Aarav 100%, Diya 50%, Rohan 100%, and Meera 100% using Present/Late as attended.
+
+------------------------------------------------------------
+Q3. SQL OPERATORS AND, OR, NOT
+------------------------------------------------------------
+
+Q3(a) Students with attendance below 50% AND failing (marks below 40)
+SQL:
+SELECT s.name,
+       ROUND(100*AVG(a.status IN ('Present','Late')),2) AS attendance_pct,
+       MIN(g.marks_obtained) AS lowest_marks
+FROM Students s
+JOIN Attendance a ON s.student_id=a.student_id
+JOIN Grades g ON g.student_id=s.student_id
+GROUP BY s.student_id, s.name
+HAVING attendance_pct < 50 AND lowest_marks < 40;
+
+Reason:
+AND requires both conditions to be true. With the supplied sample data, no student satisfies both conditions, so output is Empty set (0 rows).
+
+Q3(b) Students who scored above 90 OR have perfect attendance
+SQL:
+SELECT s.name,
+       MAX(g.marks_obtained) AS highest_marks,
+       ROUND(100*AVG(a.status IN ('Present','Late')),2) AS attendance_pct
+FROM Students s
+LEFT JOIN Grades g ON g.student_id=s.student_id
+LEFT JOIN Attendance a ON a.student_id=s.student_id
+GROUP BY s.student_id, s.name
+HAVING MAX(g.marks_obtained)>90
+    OR attendance_pct=100;
+
+Reason:
+OR returns rows when either condition is true. DISTINCT aggregation may be needed if joining multiple one-to-many tables in larger datasets; this query is suitable for the small supplied data, but the joins can duplicate rows in larger datasets.
+
+Q3(c) Faculty NOT assigned to any course
+SQL:
+SELECT f.faculty_id, f.name
+FROM Faculty f
+WHERE NOT EXISTS (
+  SELECT 1 FROM Courses c
+  WHERE c.faculty_id=f.faculty_id
+);
+
+Reason:
+NOT EXISTS returns faculty for whom no matching course exists.
+output from the supplied sample data: Empty set (0 rows), because both listed faculty members are assigned to at least one course.
+
+------------------------------------------------------------
+Q4. SORTING AND GROUPING: ORDER BY, GROUP BY
+------------------------------------------------------------
+
+Q4(a) List students alphabetically
+SQL:
+SELECT name FROM Students ORDER BY name ASC;
+
+Reason:
+ORDER BY name ASC sorts names from A to Z.
+
+output:
++--------------+
+| name         |
++--------------+
+| Aarav Sharma |
+| Diya Patel   |
+| Meera Joshi  |
+| Rohan Shah   |
++--------------+
+
+Q4(b) Count students in each department
+SQL:
+SELECT d.department_name, COUNT(s.student_id) AS total_students
+FROM Departments d
+LEFT JOIN Students s ON d.department_id=s.department_id
+GROUP BY d.department_id, d.department_name
+ORDER BY d.department_id;
+
+Reason:
+COUNT counts student IDs. LEFT JOIN also displays departments that have zero students.
+
+output:
++------------------+---------------+
+| department_name  | total_students|
++------------------+---------------+
+| Computer Science | 3             |
+| IT               | 1             |
+| Commerce         | 0             |
++------------------+---------------+
+
+Q4(c) Average marks per course
+SQL:
+SELECT c.course_name, ROUND(AVG(g.marks_obtained),2) AS average_marks
+FROM Courses c
+LEFT JOIN Grades g ON c.course_id=g.course_id
+GROUP BY c.course_id, c.course_name
+ORDER BY c.course_id;
+
+Reason:
+AVG finds the mean marks for each course. LEFT JOIN keeps courses with no grades (their average will be NULL).
+
+output:
++----------------------+---------------+
+| course_name          | average_marks |
++----------------------+---------------+
+| Database Management  | 81.50         |
+| Python Programming   | 89.00         |
+| Web Development      | 84.00         |
+| Computer Networks    | NULL          |
++----------------------+---------------+
+
+------------------------------------------------------------
+Q5. AGGREGATE FUNCTIONS: SUM, AVG, MAX, MIN, COUNT
+------------------------------------------------------------
+
+Q5(a) Average attendance percentage of students
+SQL:
+SELECT s.name,
+       ROUND(100*AVG(a.status IN ('Present','Late')),2) AS attendance_pct
+FROM Students s
+LEFT JOIN Attendance a ON a.student_id=s.student_id
+GROUP BY s.student_id, s.name
+ORDER BY s.student_id;
+
+Reason:
+AVG of 1/0 attendance values calculates the attendance percentage. A student without attendance records has NULL percentage.
+
+output:
++--------------+---------------+
+| name         | attendance_pct|
++--------------+---------------+
+| Aarav Sharma | 100.00        |
+| Diya Patel   | 50.00         |
+| Rohan Shah   | 100.00        |
+| Meera Joshi  | 100.00        |
++--------------+---------------+
+
+Q5(b) Highest and lowest marks in each course
+SQL:
+SELECT c.course_name,
+       MAX(g.marks_obtained) AS highest_marks,
+       MIN(g.marks_obtained) AS lowest_marks
+FROM Courses c
+LEFT JOIN Grades g ON c.course_id=g.course_id
+GROUP BY c.course_id, c.course_name
+ORDER BY c.course_id;
+
+Reason:
+MAX returns the highest score and MIN returns the lowest score per course.
+
+output:
++----------------------+---------------+--------------+
+| course_name          | highest_marks | lowest_marks |
++----------------------+---------------+--------------+
+| Database Management  | 95.00         | 68.00        |
+| Python Programming   | 91.00         | 87.00        |
+| Web Development      | 84.00         | 84.00        |
+| Computer Networks    | NULL          | NULL         |
++----------------------+---------------+--------------+
+
+Q5(c) Total students per department
+SQL:
+SELECT d.department_name, COUNT(s.student_id) AS total_students
+FROM Departments d
+LEFT JOIN Students s ON s.department_id=d.department_id
+GROUP BY d.department_id, d.department_name;
+
+Reason:
+COUNT(student_id) counts matching students and returns 0 for an empty department. COUNT(*) would count the unmatched LEFT JOIN row, so COUNT(s.student_id) is important.
+
+output:
+Computer Science = 3; IT = 1; Commerce = 0.
+
+------------------------------------------------------------
+Q6. PRIMARY KEY, FOREIGN KEY AND RELATIONSHIPS
+------------------------------------------------------------
+
+Q6(a) Prevent duplicate course enrollment by the same student
+SQL:
+-- Already defined in the schema:
+UNIQUE (student_id, course_id)
+
+Reason:
+The composite UNIQUE constraint prevents the same student from enrolling in the same course more than once, while allowing that student to enroll in other courses.
+
+Test (expected to fail with duplicate-key error if this pair already exists):
+INSERT INTO Enrollments (student_id, course_id, enrollment_date)
+VALUES (1,1,'2024-02-01');
+
+Q6(b) Link faculty members to the courses they teach
+SQL:
+SELECT f.name AS faculty_name, c.course_name
+FROM Faculty f
+JOIN Courses c ON c.faculty_id=f.faculty_id
+ORDER BY f.name, c.course_name;
+
+Reason:
+Courses.faculty_id is a foreign key referencing Faculty.faculty_id.
+
+output:
++---------------+---------------------+
+| faculty_name  | course_name         |
++---------------+---------------------+
+| Amit Trivedi  | Web Development     |
+| Neha Verma    | Database Management |
+| Neha Verma    | Python Programming  |
++---------------+---------------------+
+Computer Networks has no faculty assigned, so it is not shown by INNER JOIN.
+
+------------------------------------------------------------
+Q7. JOINS
+------------------------------------------------------------
+
+Q7(a) Student details with department using INNER JOIN
+SQL:
+SELECT s.student_id, s.name, d.department_name
+FROM Students s
+INNER JOIN Departments d ON s.department_id=d.department_id
+ORDER BY s.student_id;
+
+Reason:
+INNER JOIN returns only rows that match in both tables.
+
+output:
+1 Aarav Sharma – Computer Science
+2 Diya Patel – Computer Science
+3 Rohan Shah – IT
+4 Meera Joshi – Computer Science
+
+Q7(b) Students who have not enrolled in any course using LEFT JOIN
+SQL:
+SELECT s.student_id, s.name
+FROM Students s
+LEFT JOIN Enrollments e ON e.student_id=s.student_id
+WHERE e.enrollment_id IS NULL;
+
+Reason:
+LEFT JOIN keeps all students; a NULL enrollment ID means no matching enrollment exists.
+output for supplied data: Empty set (0 rows), because all four students have at least one enrollment.
+
+Q7(c) Courses with no faculty assigned using RIGHT JOIN
+SQL:
+SELECT c.course_id, c.course_name
+FROM Faculty f
+RIGHT JOIN Courses c ON c.faculty_id=f.faculty_id
+WHERE f.faculty_id IS NULL;
+
+Reason:
+RIGHT JOIN keeps every course, including those with no matching faculty. The NULL check finds unassigned courses.
+output:
++-----------+-------------------+
+| course_id | course_name       |
++-----------+-------------------+
+| 4         | Computer Networks |
++-----------+-------------------+
+
+Q7(d) Students without grades using FULL OUTER JOIN equivalent
+SQL:
+-- MySQL has no direct FULL OUTER JOIN syntax.
+SELECT s.student_id, s.name, g.course_id, g.marks_obtained
+FROM Students s
+LEFT JOIN Grades g ON g.student_id=s.student_id
+WHERE g.grade_id IS NULL
+UNION
+SELECT s.student_id, s.name, g.course_id, g.marks_obtained
+FROM Grades g
+RIGHT JOIN Students s ON s.student_id=g.student_id
+WHERE s.student_id IS NULL;
+
+Reason:
+FULL OUTER JOIN normally keeps unmatched rows from both sides. Since Grades.student_id is a foreign key, grade rows cannot refer to nonexistent students; the practical requirement “students without grades” is handled by LEFT JOIN alone.
+
+Simpler and recommended query:
+SELECT s.student_id, s.name
+FROM Students s
+LEFT JOIN Grades g ON g.student_id=s.student_id
+WHERE g.grade_id IS NULL;
+
+output for sample data: Empty set (0 rows), because each student has at least one grade.
+
+------------------------------------------------------------
+Q8. SUBQUERIES
+------------------------------------------------------------
+
+Q8(a) Students with marks above the overall average
+SQL:
+SELECT s.name, g.marks_obtained
+FROM Students s
+JOIN Grades g ON g.student_id=s.student_id
+WHERE g.marks_obtained > (SELECT AVG(marks_obtained) FROM Grades)
+ORDER BY g.marks_obtained DESC;
+
+Reason:
+The subquery calculates the average of all grade rows (85.00); the outer query returns marks greater than 85.
+
+output:
++--------------+----------------+
+| name         | marks_obtained |
++--------------+----------------+
+| Aarav Sharma | 95.00          |
+| Aarav Sharma | 91.00          |
+| Meera Joshi  | 87.00          |
++--------------+----------------+
+
+Q8(b) Courses taught by faculty with at least 5 years of experience
+SQL:
+SELECT c.course_name, f.name AS faculty_name, f.experience_years
+FROM Courses c
+JOIN Faculty f ON c.faculty_id=f.faculty_id
+WHERE f.experience_years >= 5;
+
+Reason:
+The subquery/condition filters faculty with 5 or more years of experience. In the sample data, Neha Verma has 7 years.
+
+output:
++---------------------+--------------+------------------+
+| course_name         | faculty_name | experience_years |
++---------------------+--------------+------------------+
+| Database Management | Neha Verma   | 7                |
+| Python Programming  | Neha Verma   | 7                |
++---------------------+--------------+------------------+
+
+Q8(c) Students who missed more than 10 classes
+SQL:
+SELECT s.student_id, s.name,
+       SUM(a.status='Absent') AS missed_classes
+FROM Students s
+JOIN Attendance a ON a.student_id=s.student_id
+GROUP BY s.student_id, s.name
+HAVING SUM(a.status='Absent') > 10;
+
+Reason:
+SUM(status='Absent') counts absent attendance records. The provided sample data has only six attendance rows total, so output is Empty set (0 rows). Add more attendance records to test this requirement.
+
+------------------------------------------------------------
+Q9. DATE AND TIME FUNCTIONS
+------------------------------------------------------------
+
+Q9(a) Extract month from attendance_date
+SQL:
+SELECT MONTH(attendance_date) AS attendance_month,
+       COUNT(*) AS attendance_records
+FROM Attendance
+GROUP BY MONTH(attendance_date)
+ORDER BY attendance_month;
+
+Reason:
+MONTH() extracts the month number; GROUP BY counts attendance records for each month.
+
+output:
++------------------+--------------------+
+| attendance_month | attendance_records |
++------------------+--------------------+
+| 1                | 6                  |
++------------------+--------------------+
+
+Q9(b) Calculate years since admission
+SQL:
+SELECT name, admission_date,
+       TIMESTAMPDIFF(YEAR, admission_date, CURDATE()) AS years_since_admission
+FROM Students
+ORDER BY student_id;
+
+Reason:
+TIMESTAMPDIFF(YEAR, ...) calculates completed years between admission date and today's date. The numeric result changes with the date you run the query.
+
+Q9(c) Format attendance_date as DD-MM-YYYY
+SQL:
+SELECT attendance_id,
+       DATE_FORMAT(attendance_date,'%d-%m-%Y') AS formatted_date,
+       status
+FROM Attendance
+ORDER BY attendance_id;
+
+Reason:
+DATE_FORMAT changes the display format; it does not change the stored DATE value.
+Example: 2024-01-01 becomes 01-01-2024.
+
+------------------------------------------------------------
+Q10. STRING FUNCTIONS
+------------------------------------------------------------
+
+Q10(a) Convert faculty names to uppercase
+SQL:
+SELECT UPPER(name) AS faculty_name FROM Faculty;
+
+Reason:
+UPPER() converts lowercase letters to uppercase.
+
+output:
++---------------+
+| faculty_name  |
++---------------+
+| NEHA VERMA    |
+| AMIT TRIVEDI  |
++---------------+
+
+Q10(b) Trim unnecessary spaces from student names
+SQL:
+SELECT TRIM(name) AS student_name FROM Students;
+
+Reason:
+TRIM() removes spaces at the beginning and end of a string.
+
+Q10(c) Replace NULL email with “Email Not Provided”
+SQL:
+SELECT name, COALESCE(email,'Email Not Provided') AS email
+FROM Students;
+
+Reason:
+COALESCE returns the first non-NULL value. Existing sample students have emails, so the placeholder appears only when an email is NULL.
+
+------------------------------------------------------------
+Q11. WINDOW FUNCTIONS
+------------------------------------------------------------
+
+Q11(a) Rank students based on overall/average marks
+SQL:
+WITH averages AS (
+  SELECT s.student_id, s.name, AVG(g.marks_obtained) AS avg_marks
+  FROM Students s
+  JOIN Grades g ON s.student_id=g.student_id
+  GROUP BY s.student_id, s.name
+)
+SELECT name, ROUND(avg_marks,2) AS average_marks,
+       RANK() OVER (ORDER BY avg_marks DESC) AS student_rank
+FROM averages
+ORDER BY student_rank;
+
+Reason:
+The CTE calculates one average per student. RANK() assigns rank 1 to the highest average. Tied averages receive the same rank and the next rank can be skipped.
+
+output:
++--------------+---------------+--------------+
+| name         | average_marks | student_rank |
++--------------+---------------+--------------+
+| Aarav Sharma | 93.00         | 1            |
+| Meera Joshi  | 87.00         | 2            |
+| Rohan Shah   | 84.00         | 3            |
+| Diya Patel   | 68.00         | 4            |
++--------------+---------------+--------------+
+
+Q11(b) Cumulative attendance percentage per course
+SQL:
+WITH daily AS (
+  SELECT course_id, attendance_date,
+         SUM(status IN ('Present','Late')) AS attended,
+         COUNT(*) AS total_records
+  FROM Attendance
+  GROUP BY course_id, attendance_date
+)
+SELECT c.course_name, d.attendance_date,
+       ROUND(100 * SUM(d.attended) OVER (
+         PARTITION BY d.course_id ORDER BY d.attendance_date
+         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+       ) / SUM(d.total_records) OVER (
+         PARTITION BY d.course_id ORDER BY d.attendance_date
+         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+       ),2) AS cumulative_attendance_pct
+FROM daily d
+JOIN Courses c ON c.course_id=d.course_id
+ORDER BY c.course_name, d.attendance_date;
+
+Reason:
+The window SUM accumulates attended and total records by course through each date. Dividing the cumulative counts gives the running percentage.
+
+Q11(c) Running total of students enrolled per month
+SQL:
+WITH monthly AS (
+  SELECT DATE_FORMAT(enrollment_date,'%Y-%m') AS enrollment_month,
+         COUNT(*) AS new_enrollments
+  FROM Enrollments
+  GROUP BY DATE_FORMAT(enrollment_date,'%Y-%m')
+)
+SELECT enrollment_month, new_enrollments,
+       SUM(new_enrollments) OVER (ORDER BY enrollment_month) AS running_total
+FROM monthly
+ORDER BY enrollment_month;
+
+Reason:
+The first query counts enrollments in each month. The window SUM adds each month to the total from previous months.
+
+------------------------------------------------------------
+Q12. CASE EXPRESSIONS
+------------------------------------------------------------
+
+Q12(a) Assign performance levels
+SQL:
+SELECT s.name, c.course_name, g.marks_obtained,
+       CASE
+         WHEN g.marks_obtained > 90 THEN 'Excellent'
+         WHEN g.marks_obtained BETWEEN 75 AND 90 THEN 'Good'
+         ELSE 'Needs Improvement'
+       END AS performance
+FROM Grades g
+JOIN Students s ON s.student_id=g.student_id
+JOIN Courses c ON c.course_id=g.course_id
+ORDER BY s.student_id, c.course_id;
+
+Reason:
+CASE checks conditions in order. More than 90 is Excellent; 75 through 90 inclusive is Good; anything else is Needs Improvement.
+
+output:
++--------------+---------------------+----------------+-------------------+
+| name         | course_name         | marks_obtained | performance       |
++--------------+---------------------+----------------+-------------------+
+| Aarav Sharma | Database Management |          95.00 | Excellent         |
+| Aarav Sharma | Python Programming  |          91.00 | Excellent         |
+| Diya Patel   | Database Management |          68.00 | Needs Improvement |
+| Rohan Shah   | Web Development     |          84.00 | Good              |
+| Meera Joshi  | Python Programming  |          87.00 | Good              |
++--------------+---------------------+----------------+-------------------+
+5 rows in set (0.00 sec)
+
+Q12(b) Categorize attendance records
+SQL:
+SELECT s.name,
+       ROUND(100*AVG(a.status IN ('Present','Late')),2) AS attendance_pct,
+       CASE
+         WHEN 100*AVG(a.status IN ('Present','Late')) > 80 THEN 'Regular'
+         WHEN 100*AVG(a.status IN ('Present','Late')) BETWEEN 50 AND 80 THEN 'Irregular'
+         ELSE 'Defaulter'
+       END AS attendance_status
+FROM Students s
+JOIN Attendance a ON a.student_id=s.student_id
+GROUP BY s.student_id, s.name
+ORDER BY s.student_id;
+
+Reason:
+CASE classifies each student's calculated attendance: over 80% Regular; 50% through 80% Irregular; below 50% Defaulter. This follows the assignment wording (“above 80%”, “between 50% and 80%”, “otherwise”).
+
+output:
++--------------+---------------+------------------+
+| name         | attendance_pct| attendance_status|
++--------------+---------------+------------------+
+| Aarav Sharma | 100.00        | Regular          |
+| Diya Patel   | 50.00         | Irregular        |
+| Rohan Shah   | 100.00        | Regular          |
+| Meera Joshi  | 100.00        | Regular          |
++--------------+---------------+------------------+
+
+------------------------------------------------------------
+EXTRA USEFUL QUERIES
+------------------------------------------------------------
+
+All departments:
+SELECT * FROM Departments;
+
+All faculty:
+SELECT * FROM Faculty;
+
+All courses with faculty (including unassigned courses):
+SELECT c.course_name, f.name AS faculty_name
+FROM Courses c
+LEFT JOIN Faculty f ON c.faculty_id=f.faculty_id;
+
+All enrollments with student and course names:
+SELECT s.name, c.course_name, e.enrollment_date
+FROM Enrollments e
+JOIN Students s ON e.student_id=s.student_id
+JOIN Courses c ON e.course_id=c.course_id
+ORDER BY e.enrollment_date;
+
+All attendance records with student and course:
+SELECT s.name, c.course_name, a.attendance_date, a.status
+FROM Attendance a
+JOIN Students s ON a.student_id=s.student_id
+JOIN Courses c ON a.course_id=c.course_id
+ORDER BY a.attendance_date, s.name;
+
+All grades with student and course:
+SELECT s.name, c.course_name, g.marks_obtained, g.grade
+FROM Grades g
+JOIN Students s ON g.student_id=s.student_id
+JOIN Courses c ON g.course_id=c.course_id
+ORDER BY s.name, c.course_name;
+
+------------------------------------------------------------
